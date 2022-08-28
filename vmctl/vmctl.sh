@@ -1,6 +1,7 @@
 #!/bin/bash
 set -e
 
+script_dir="$(dirname -- $0)"
 script="$(basename $0)"
 
 RED='\033[0;31m'
@@ -84,7 +85,7 @@ function start {
 		exit 1
 	fi
 	args="$(compile_args "$dir")"
-	SCREENDIR="$dir/screen" screen -dm sh -c "pushd \"$dir\" > /dev/null; vmcli $args"
+	SCREENDIR="$dir/screen" screen -dm sh -c "pushd \"$dir\" > /dev/null; $script_dir/vmcli $args"
 }
 
 function attach {

@@ -10,16 +10,19 @@ set -e
 # disk size, default to 4096 mb
 disk_size=4096 # 4096 MB
 
-# write default config, change if needed
-cat << EOF > vm.conf
+if [ ! -e vm.conf ]; then
+  # write default config, change if needed
+  cat << EOF > vm.conf
 kernel=vmlinux
 initrd=initrd
-cmdline=console=hvc0 irqfixup root=/dev/vda
+cmdline=console=hvc0 irqaffinity=0 nospec_store_bypass_disable noibrs noibpb no_stf_barrier mitigations=off root=/dev/vda
 cpu-count=1
-memory-size=1024
+memory-size=512
 disk=disk.img
 network=nat
+balloon=true
 EOF
+fi
 
 arch="$(/usr/bin/uname -m)"
 
@@ -27,35 +30,30 @@ if [ "$arch" = "x86_64" ]; then
 	arch="amd64"
 fi
 
-if [ ! -e ~/.ssh/id_rsa.pub ]; then
-	echo "cannot find ~/.ssh/id_rsa.pub, stop" >&2
+if [ ! -e ~/.ssh/vm.pub ]; then
+	echo "cannot find ~/.ssh/vm.pub, stop" >&2
 	exit 1
 fi
 
 # download files
 if [ ! -e vmlinux ]; then
-if [ "$arch" = "amd64" ]; then
-/usr/bin/curl -o vmlinux "https://cloud-images.ubuntu.com/releases/focal/release/unpacked/ubuntu-20.04-server-cloudimg-$arch-vmlinuz-generic"
-else
-/usr/bin/curl -o vmlinux.gz "https://cloud-images.ubuntu.com/releases/focal/release/unpacked/ubuntu-20.04-server-cloudimg-$arch-vmlinuz-generic"
-gunzip vmlinux.gz
-fi
+  curl -o vmlinux.gz "https://cloud-images.ubuntu.com/releases/jammy/release/unpacked/ubuntu-22.04-server-cloudimg-$arch-vmlinuz-generic"
+  gunzip vmlinux.gz
+  curl -o build-info.txt "https://cloud-images.ubuntu.com/releases/jammy/release/unpacked/build-info.txt"
 fi
 
 if [ ! -e initrd ]; then
-/usr/bin/curl -o initrd "https://cloud-images.ubuntu.com/releases/focal/release/unpacked/ubuntu-20.04-server-cloudimg-$arch-initrd-generic"
+  curl -o initrd "https://cloud-images.ubuntu.com/releases/jammy/release/unpacked/ubuntu-22.04-server-cloudimg-$arch-initrd-generic"
 fi
 
-if [ ! -e disk.tar.gz ]; then
-/usr/bin/curl -o disk.tar.gz "https://cloud-images.ubuntu.com/releases/focal/release/ubuntu-20.04-server-cloudimg-$arch.tar.gz"
-fi
+if [ ! -e disk.img ]; then
+  curl -o disk.tar.gz "https://cloud-images.ubuntu.com/releases/jammy/release/ubuntu-22.04-server-cloudimg-$arch.tar.gz"
+  tar xzvf disk.tar.gz
+  mv "jammy-server-cloudimg-$arch.img" disk.img
+  rm README
 
-tar xzvf disk.tar.gz
-mv "focal-server-cloudimg-$arch.img" disk.img
-rm README
-
-# create cloudinit config
-cat << EOF > user.yaml
+  # create cloudinit config
+  cat << EOF > user.yaml
 users:
   - name: $USER
     lock_passwd: False
@@ -67,8 +65,8 @@ users:
       - $(cat ~/.ssh/id_rsa.pub | head -n 1)
 EOF
 
-# boot into initramfs to modify the disk image
-cat << EOFOUTER | expect | sed 's/[^[:print:]]//g'
+  # boot into initramfs to modify the disk image
+  cat << EOFOUTER | expect | sed 's/[^[:print:]]//g'
 set timeout 60
 spawn vmcli -k vmlinux --initrd=initrd -d disk.img "--cmdline=console=hvc0 irqfixup"
 
@@ -92,8 +90,9 @@ expect "(initramfs) "
 send -- "poweroff\r"
 EOFOUTER
 
-# expand disk to 4GB
-/bin/dd if=/dev/null of=disk.img bs=1m count=0 seek="$disk_size"
+  # expand disk to 4GB
+  /bin/dd if=/dev/null of=disk.img bs=1m count=0 seek="$disk_size"
+fi
 
 # perform clean up
 if [ "$skip_cleanup" != "" ]; then
