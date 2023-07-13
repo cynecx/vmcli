@@ -4,6 +4,7 @@ import Virtualization
 
 enum BootLoader: String, ExpressibleByArgument {
     case linux
+    case efi
 }
 
 enum SizeSuffix: UInt64, ExpressibleByArgument {
@@ -168,13 +169,16 @@ Omit mac address for a generated address.
     var balloon: Bool = true
 
     @Option(name: .shortAndLong, help: "Bootloader to use")
-    var bootloader: BootLoader = BootLoader.linux
+    var bootloader: BootLoader
 
     @Option(name: .shortAndLong, help: "Kernel to use")
     var kernel: String?
 
     @Option(help: "Initrd to use")
     var initrd: String?
+
+    @Option(help: "EFI variable store to use")
+    var efivars: String?
 
     @Option(help: "Kernel cmdline to use")
     var cmdline: String?
@@ -204,6 +208,17 @@ Omit mac address for a generated address.
                 vmBootLoader.commandLine = cmdline!
             }
             vmCfg.bootLoader = vmBootLoader
+        case BootLoader.efi:
+            if efivars == nil {
+                throw ValidationError("efivars not specified")
+            }
+            let efiVarsUrl = URL(fileURLWithPath: efivars!)
+            let efiVarStore = FileManager.default.fileExists(atPath: efiVarsUrl.path)
+                ? VZEFIVariableStore(url: efiVarsUrl)
+                : try VZEFIVariableStore(creatingVariableStoreAt: efiVarsUrl)
+            let bootloader = VZEFIBootLoader()
+            bootloader.variableStore = efiVarStore
+            vmCfg.bootLoader = bootloader
         }
 
         // set up tty
