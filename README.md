@@ -149,6 +149,21 @@ GRUB_CMDLINE_LINUX_DEFAULT="console=hvc0 irqaffinity=0 mitigations=off"
 GRUB_DEFAULT=0
 GRUB_TIMEOUT=0
 
+# Default grub doesn't appear to find the initramfs image.
+# Fix that by applying this patch
+--- a/etc/grub.d/10_linux	2023-07-25 01:29:17.628000113 +0200
++++ b/etc/grub.d/10_linux	2023-07-25 01:28:58.621000104 +0200
+@@ -236,7 +236,8 @@
+ 	   "initramfs-genkernel-${version}" \
+ 	   "initramfs-genkernel-${alt_version}" \
+ 	   "initramfs-genkernel-${GENKERNEL_ARCH}-${version}" \
+-	   "initramfs-genkernel-${GENKERNEL_ARCH}-${alt_version}"; do
++	   "initramfs-genkernel-${GENKERNEL_ARCH}-${alt_version}" \
++	   "initramfs-linux.img"; do
+     if test -e "${dirname}/${i}" ; then
+       initrd_real="${i}"
+       break
+
 # Generate grub config
 grub-mkconfig -o /boot/grub/grub.cfg
 
