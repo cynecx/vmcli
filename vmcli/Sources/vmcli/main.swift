@@ -80,15 +80,20 @@ func quit(_ code: Int32) -> Never {
     return exit(code)
 }
 
-func openDisk(path: String, readOnly: Bool) throws -> VZVirtioBlockDeviceConfiguration {
+func openDisk(path: String, readOnly: Bool) throws -> VZStorageDeviceConfiguration {
     let vmDiskURL = URL(fileURLWithPath: path)
     let vmDisk: VZDiskImageStorageDeviceAttachment
     do {
-        vmDisk = try VZDiskImageStorageDeviceAttachment(url: vmDiskURL, readOnly: readOnly)
+        vmDisk = try VZDiskImageStorageDeviceAttachment(
+            url: vmDiskURL,
+            readOnly: readOnly,
+            cachingMode: .cached,
+            synchronizationMode: .full
+        )
     } catch {
         throw error
     }
-    let vmBlockDevCfg = VZVirtioBlockDeviceConfiguration(attachment: vmDisk)
+    let vmBlockDevCfg = VZNVMExpressControllerDeviceConfiguration(attachment: vmDisk)
     return vmBlockDevCfg
 }
 
@@ -302,8 +307,12 @@ Omit mac address for a generated address.
         }
 
         // set up memory balloon
-        let balloonCfg = VZVirtioTraditionalMemoryBalloonDeviceConfiguration()
-        vmCfg.memoryBalloonDevices = [ balloonCfg ]
+        if balloon {
+            let balloonCfg = VZVirtioTraditionalMemoryBalloonDeviceConfiguration()
+            vmCfg.memoryBalloonDevices = [balloonCfg]
+        } else {
+            vmCfg.memoryBalloonDevices = []
+        }
 
         vmCfg.entropyDevices = [ VZVirtioEntropyDeviceConfiguration() ]
 
