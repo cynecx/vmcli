@@ -93,7 +93,7 @@ func openDisk(path: String, readOnly: Bool) throws -> VZStorageDeviceConfigurati
     } catch {
         throw error
     }
-    let vmBlockDevCfg = VZNVMExpressControllerDeviceConfiguration(attachment: vmDisk)
+    let vmBlockDevCfg = VZVirtioBlockDeviceConfiguration(attachment: vmDisk)
     return vmBlockDevCfg
 }
 
